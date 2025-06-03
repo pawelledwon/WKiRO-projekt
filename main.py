@@ -3,11 +3,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from scripts.aruco_localizer import load_aruco_positions, load_fpv_camera_parameters
+from scripts.aruco_localizer import load_aruco_topright_positions, load_fpv_camera_parameters 
 
 # Parametry
 video_path = "DPJAIT/Real_Data/R18_D1_A/GX010280.MP4"
-marker_length = 20 
 aruco_excel_path = "DPJAIT/Real_Data/R18_D1_A/ArUco_3D.xlsx"
 fpv_camera_data_path = "DPJAIT/Real_Data/R18_D1_A/fpv_camera_data.csv"
 output_csv = "my_camera_poses.csv"
@@ -15,7 +14,7 @@ distortion = [-0.1577, 0.08576, -0.00068, 0.00008]
 
 
 # Wczytaj znane pozycje 3D markerów
-marker_dict = load_aruco_positions(aruco_excel_path, marker_length=marker_length)
+marker_dict = load_aruco_topright_positions(aruco_excel_path)
 
 # Kamera FPV – przykładowe parametry wewnętrzne
 camera_matrix, dist_coeffs = load_fpv_camera_parameters(fpv_camera_data_path, distortion)
@@ -42,11 +41,11 @@ while cap.isOpened():
 
         for i, marker_id in enumerate(ids.flatten()):
             if marker_id in marker_dict:
-                obj_pts = marker_dict[marker_id]
-                img_pts = corners[i][0]
+                obj_pt = marker_dict[marker_id]
+                img_pt = corners[i][0][1]  # [1] to top-right róg w OpenCV
 
-                object_points.extend(obj_pts)
-                image_points.extend(img_pts)
+                object_points.append(obj_pt)
+                image_points.append(img_pt)
 
         object_points = np.array(object_points, dtype=np.float32)
         image_points = np.array(image_points, dtype=np.float32)
@@ -57,15 +56,21 @@ while cap.isOpened():
                 camera_matrix, dist_coeffs
             )
             if success:
-                poses.append({
-                    "frame": frame_id,
-                    "rvec_x": rvec[0][0],
-                    "rvec_y": rvec[1][0],
-                    "rvec_z": rvec[2][0],
-                    "tvec_x": tvec[0][0],
-                    "tvec_y": tvec[1][0],
-                    "tvec_z": tvec[2][0],
-                })
+                    tx, ty, tz = tvec.flatten()
+                    # Zamiana z układu OpenCV na referencyjny (przykład dopasowania do Vicon)
+                    corrected_x = -tx
+                    corrected_y = -tz
+                    corrected_z = ty
+
+                    poses.append({
+                        "frame": frame_id,
+                        "rvec_x": rvec[0][0],
+                        "rvec_y": rvec[1][0],
+                        "rvec_z": rvec[2][0],
+                        "tvec_x": corrected_x,
+                        "tvec_y": corrected_y,
+                        "tvec_z": corrected_z,
+                    })
 
     frame_id += 1
 

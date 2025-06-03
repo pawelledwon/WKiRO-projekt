@@ -1,65 +1,14 @@
 import pandas as pd
 import numpy as np
 
-def get_marker_corners(center, normal_axis, up_axis, marker_length):
-    """Oblicza narożniki markera wokół centrum na podstawie jego normalnej i osi „góry”"""
-    half = marker_length / 2
-
-    # Weź wektory jednostkowe
-    unit = {
-        'x': np.array([1, 0, 0]),
-        'y': np.array([0, 1, 0]),
-        'z': np.array([0, 0, 1]),
-        '-x': np.array([-1, 0, 0]),
-        '-y': np.array([0, -1, 0]),
-        '-z': np.array([0, 0, -1]),
-    }
-
-    right = np.cross(unit[normal_axis], unit[up_axis])
-    up = unit[up_axis]
-
-    # 4 narożniki wokół środka
-    corners = np.array([
-        center + half * right + half * up,    # top-right
-        center - half * right + half * up,    # top-left
-        center - half * right - half * up,    # bottom-left
-        center + half * right - half * up,    # bottom-right
-    ])
-
-    return corners
-
-
-def load_aruco_positions(path, marker_length=0.2):
+def load_aruco_topright_positions(path):
     df = pd.read_excel(path)
     marker_dict = {}
 
     for _, row in df.iterrows():
         marker_id = int(row['ID'])
         x, y, z = row['x'], row['y'], row['z']
-        wall = str(row['wall #']).strip()
-
-        center = np.array([x, y, z])
-
-        # Ustal orientację zależnie od ściany
-        if wall == "1.0":
-            normal_axis = '-x'
-            up_axis = 'z'
-        elif wall == "2.0":
-            normal_axis = '-y'
-            up_axis = 'z'
-        elif wall == "3.0":
-            normal_axis = 'x'
-            up_axis = 'z'
-        elif wall == "4.0":
-            normal_axis = 'y'
-            up_axis = 'z'
-        else:
-            print(f"[WARN] Nieznana ściana: {wall}, używam domyślnej XY")
-            normal_axis = '-z'
-            up_axis = 'y'
-
-        corners = get_marker_corners(center, normal_axis, up_axis, marker_length)
-        marker_dict[marker_id] = corners
+        marker_dict[marker_id] = np.array([x, y, z], dtype=np.float32)
 
     return marker_dict
 
